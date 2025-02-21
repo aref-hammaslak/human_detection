@@ -1,0 +1,4 @@
+.venv
+src/_pycache_
+.gitignore
+.git
