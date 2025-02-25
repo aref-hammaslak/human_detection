@@ -1,7 +1,11 @@
 import onnx
 import onnxruntime as ort
 import cv2
+import numpy as np
 from utils import Box, convert_boxes_to_xyxyc
+import os
+import time
+
 
 class Dectect:
     def __init__(self, onnx_model_path, iou, cof, img_size):
@@ -12,6 +16,21 @@ class Dectect:
         self.iou_thr = iou
         self.cof_thr = cof
         self.img_size = img_size
+
+        #onnx runtime config
+        sess_options = ort.SessionOptions()
+        sess_options.intra_op_num_threads =  os.cpu_count()  # Adjust based on CPU cores
+        sess_options.execution_mode = ort.ExecutionMode.ORT_PARALLEL  # Enable parallel execution
+        sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        
+    def predict_from_buffer(self, image_buffer):
+        np_arr = np.frombuffer(image_buffer, np.uint8)
+        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        img = self.preprocess(img)
+        input_data = {self.input_name: img}
+        results = self.session.run([self.output_name], input_data)
+        output = self.postprocess(results[0])[0]
+        return output
         
     def predict_from_webcam(self):
         cap = cv2.VideoCapture(0)
@@ -35,7 +54,11 @@ class Dectect:
         img = cv2.imread(file_path)
         img = self.preprocess(img)
         input_data = {self.input_name: img}
+
+        start = time.time()
         results = self.session.run([self.output_name], input_data)
+        print("Model inference time:", time.time() - start)
+        
         output = self.postprocess(results[0])[0]
         print(f"( {len(output)} ) objects Detected")
         print(f"Bouding boxes: {output}")
@@ -66,12 +89,32 @@ class Dectect:
                         "confidence": float(confidence)
                     })
             final_boxes = self.non_max_suppression(boxes, iou_threshold=self.iou_thr)
-            final_boxes = self.normalize(final_boxes)
+            # final_boxes = self.normalize(final_boxes)
+            final_boxes = convert_boxes_to_xyxyc(final_boxes)
+            final_boxes = self.normalize_xyxy(final_boxes)
             processed_results.append(final_boxes)
 
         return processed_results
     
-    def normalize(self, boxes):
+    def normalize_xyxy(self, boxes):
+        """Normalize (x1, y1, x2, y2) to (0.0-1.0) range."""
+        img_width, img_height = self.img_size, self.img_size
+        normalized_boxes = []
+        for box in boxes:
+            x1 = box["x1"] / img_width
+            y1 = box["y1"] / img_height
+            x2 = box["x2"] / img_width
+            y2 = box["y2"] / img_height
+            normalized_boxes.append({
+                "x1": x1,
+                "y1": y1,
+                "x2": x2,
+                "y2": y2,
+                "confidence": box["confidence"]
+            })
+        return normalized_boxes
+    
+    def normalize_xywh(self, boxes):
         """Normalize (x_center, y_center, width, height) to (0.0-1.0) range."""
         img_width, img_height = self.img_size, self.img_size
         normalized_boxes = []
@@ -96,8 +139,8 @@ class Dectect:
         w2, h2 = box2["width"], box2["height"]
 
         # Convert (x, y, width, height) to (x1, y1, x2, y2)
-        box1 = convert_boxes_to_xyxyc([box1])
-        box2 = convert_boxes_to_xyxyc([box2])
+        box1 = convert_boxes_to_xyxyc([box1])[0]
+        box2 = convert_boxes_to_xyxyc([box2])[0]
         x1_min, y1_min, x1_max, y1_max = box1["x1"], box1["y1"], box1["x2"], box1["y2"]
         x2_min, y2_min, x2_max, y2_max = box2["x1"], box2["y1"], box2["x2"], box2["y2"]
 
