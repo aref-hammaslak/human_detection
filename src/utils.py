@@ -18,5 +18,5 @@ def convert_boxes_to_xyxyc(boxes):
         xyxyc_boxes.append({"x1": x1, "y1": y1, "x2": x2, "y2": y2, "confidence": box["confidence"]})
     
     
-    return xyxyc_boxes[0] if len(xyxyc_boxes) == 1 else xyxyc_boxes
+    return xyxyc_boxes
     
