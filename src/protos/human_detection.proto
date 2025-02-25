@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package human_detection;
+
+// The HumanDetection service definition.
+service HumanDetection {
+    // Sends a detection request.
+    rpc Detect (DetectionRequest) returns (DetectionResponse);
+    
+    // Sends a stream detection request.
+    rpc StreamDetect (stream DetectionRequest) returns (stream DetectionResponse);
+}
+
+// The request message containing the image data.
+message DetectionRequest {
+    bytes image_data = 1;
+}
+
+// The response message containing the detection results.
+message DetectionResponse {
+    repeated Human humans = 1;
+}
+
+// The Human message containing the details of a detected human.
+message Human {
+    string id = 1;
+    float confidence = 2;
+    BoundingBox bounding_box = 3;
+}
+
+// The BoundingBox message containing the coordinates of the detected human.
+message BoundingBox {
+    float x_min = 1;
+    float y_min = 2;
+    float x_max = 3;
+    float y_max = 4;
+}
