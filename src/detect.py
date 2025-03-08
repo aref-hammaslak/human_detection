@@ -2,6 +2,14 @@ import onnx
 import onnxruntime as ort
 import cv2
 from utils import Box, convert_boxes_to_xyxyc
+import threading
+from utils import FrameCaptureThread ,FrameProcessingThread
+import queue
+import time
+
+# RTSP stream URL TEST IP CAMERA
+RTSP_URL = "rtsp://admin:AdminNasir58@192.168.1.107:554"
+
 
 class Dectect:
     def __init__(self, onnx_model_path, iou, cof, img_size):
@@ -12,9 +20,33 @@ class Dectect:
         self.iou_thr = iou
         self.cof_thr = cof
         self.img_size = img_size
+
+        ################
+        self.frame_queue = queue.Queue(maxsize=5)
+        self.capture_thread = FrameCaptureThread(RTSP_URL, self.frame_queue)
+        self.processing_thread = FrameProcessingThread(self.frame_queue)
         
     def predict_from_webcam(self):
-        cap = cv2.VideoCapture(0)
+        cap = cv2.VideoCapture('rtsp://admin:AdminNasir58@192.168.1.107:554')
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            img = self.preprocess(frame)
+            input_data = {self.input_name: img}
+            results = self.session.run([self.output_name], input_data)
+            output = self.postprocess(results[0])[0]
+            print(f"( {len(output)} ) objects Detected")
+            print(f"Bouding boxes: {output}")
+            print("------------------------------------------------------")
+            cv2.imshow("Processed Frame", frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        cap.release()
+        cv2.destroyAllWindows()
+
+    def predict_from_webcam_with_threads(self):
+        cap = cv2.VideoCapture('rtsp://admin:AdminNasir58@192.168.1.107:554')
         while True:
             ret, frame = cap.read()
             if not ret:
@@ -28,9 +60,11 @@ class Dectect:
             print("------------------------------------------------------")
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
+            
         cap.release()
         cv2.destroyAllWindows()
-        
+
+
     def predict_from_file(self, file_path):
         img = cv2.imread(file_path)
         img = self.preprocess(img)
@@ -136,3 +170,28 @@ class Dectect:
             
 
         return final_boxes
+
+
+# Capture Frames Thread
+
+import os 
+
+def main():
+
+    onnx_model_path = os.path.abspath("yolo11m.onnx")
+    iou = 0.45
+    cof = 0.5
+    img_size = 640
+    detect = Dectect(onnx_model_path, iou, cof, img_size)
+    detect.predict_from_webcam_with_threads()
+
+    detect.capture_thread.start()
+    detect.processing_thread.start()
+
+    try:
+        while True:
+            time.sleep(1)  # Keep main thread alive
+    except KeyboardInterrupt:
+        print("Stopping threads...")
+        capture_thread.stop()
+        processing_thread.stop()

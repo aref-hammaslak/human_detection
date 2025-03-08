@@ -2,7 +2,7 @@ from detect import Dectect
 import os
 
 def main():
-    onnx_model_path = os.path.abspath("humman_detector.onnx")
+    onnx_model_path = os.path.abspath("yolo11m.onnx")
     iou = 0.45
     cof = 0.5
     img_size = 640
