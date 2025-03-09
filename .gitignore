@@ -2,3 +2,4 @@
 **/__pycache__
 human_detector.onnx
 yolo11m.onnx
+model*

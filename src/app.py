@@ -1,13 +1,20 @@
-from detect import Dectect
-import os
+from detect import Detect
+import time
+from pathlib import Path
 
 def main():
-    onnx_model_path = os.path.abspath("yolo11m.onnx")
-    iou = 0.45
-    cof = 0.5
-    img_size = 640
-    detect = Dectect(onnx_model_path, iou, cof, img_size)
-    detect.predict_from_webcam()
-    
+    source = 0  # Webcam source
+    print(f"Source: {source}")
+    detect = Detect(source=source, model_path= 'yolo11.onnx')
+    detect.start()
+
+    try:
+        while True:
+            time.sleep(1)  # Keep main thread alive
+    except KeyboardInterrupt:
+        print("Stopping threads...")
+        detect.stop()
+
+
 if __name__ == "__main__":
     main()
