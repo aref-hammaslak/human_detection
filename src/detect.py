@@ -33,6 +33,7 @@ class FrameCaptureThread(threading.Thread):
 
             frame = self.preprocess(frame)
 
+
             # Put frame in queue (Drop old frames if queue is full)
             if not self.queue.full():
                 self.queue.put(frame)
@@ -53,6 +54,7 @@ class FrameProcessingThread(threading.Thread):
         iou=0.45,
         conf=0.4,
         target_classes=[0],
+        fps_delay=60
         ):
 
         super().__init__()
@@ -66,6 +68,9 @@ class FrameProcessingThread(threading.Thread):
         self.conf = conf
         self.frame_count = 0
         self.start_time = time.time()
+        self.fps_delay = fps_delay
+        
+        print(f"fps will be printed after: {self.fps_delay}s") 
 
     def run(self):
         while self.running:
@@ -76,7 +81,6 @@ class FrameProcessingThread(threading.Thread):
                     continue
                 
                 print(f"frame shape: {frame.shape}")
-                self.frame_count += 1
 
                 results = self.model(
                     frame,
@@ -92,15 +96,17 @@ class FrameProcessingThread(threading.Thread):
                 print("------------------------------------------------------")
 
                 # Display the processed frame
-                cv2.imshow("Processed Frame", frame)
+                # cv2.imshow("Processed Frame", results[0].plot())
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     self.stop()
                     break
 
-                # Calculate and display FPS
-                elapsed_time = time.time() - self.start_time
-                fps = self.frame_count / elapsed_time
-                print(f"FPS: {fps:.2f}")
+                if self.start_time < time.time() - self.fps_delay:
+                    # Calculate and display FPS
+                    self.frame_count += 1
+                    elapsed_time = time.time() - self.start_time -self.fps_delay
+                    fps = self.frame_count / elapsed_time
+                    print(f"FPS: {fps:.2f}")
 
     def stop(self):
         self.running = False
