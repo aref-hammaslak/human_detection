@@ -5,6 +5,7 @@ import threading
 import time
 from  ultralytics import YOLO
 import numpy as np
+import os
 
 
 class FrameCaptureThread(threading.Thread):
@@ -51,8 +52,8 @@ class FrameProcessingThread(threading.Thread):
         self,
         queue,
         model_path,
-        iou=0.45,
-        conf=0.4,
+        iou=os.getenv('IOU', 0.45),
+        conf=os.getenv('CONF', 0.4),
         target_classes=[0],
         fps_delay=60
         ):

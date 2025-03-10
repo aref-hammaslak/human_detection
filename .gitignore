@@ -3,3 +3,4 @@
 human_detector.onnx
 yolo11m.onnx
 model*
+.env
