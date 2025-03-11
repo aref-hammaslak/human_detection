@@ -9,8 +9,9 @@ import os
 
 
 class FrameCaptureThread(threading.Thread):
-    def __init__(self, source, queue, ):
+    def __init__(self, source, queue, daemon=True):
         super().__init__()
+        self.daemon = daemon
         self.source = source
         self.queue = queue
         self.running = True
@@ -55,10 +56,12 @@ class FrameProcessingThread(threading.Thread):
         iou=os.getenv('IOU', 0.45),
         conf=os.getenv('CONF', 0.4),
         target_classes=[0],
-        fps_delay=60
-        ):
+        fps_delay=60,
+        daemon=True,
+        parent=None,):
 
         super().__init__()
+        self.daemon = daemon
         self.queue = queue
         self.running = True
         self.model = YOLO(model_path, task='detect')  # Load YOLO model from Ultralytics
@@ -70,8 +73,10 @@ class FrameProcessingThread(threading.Thread):
         self.frame_count = 0
         self.start_time = time.time()
         self.fps_delay = fps_delay
+        self.fps = 0
+        self.parent : Detect = parent
         
-        print(f"fps will be printed after: {self.fps_delay}s") 
+        # print(f"fps will be printed after: {self.fps_delay}s") 
 
     def run(self):
         while self.running:
@@ -79,9 +84,7 @@ class FrameProcessingThread(threading.Thread):
                 frame = self.queue.get()
 
                 if frame is None or frame.size == 0:
-                    continue
-                
-                print(f"frame shape: {frame.shape}")
+                    continue  # Skip invalid frames
 
                 results = self.model(
                     frame,
@@ -91,24 +94,31 @@ class FrameProcessingThread(threading.Thread):
                     verbose=False
                     )  # Perform detection
                 
-                output = results[0].boxes.xyxy
-                print(f"( {len(output)} ) objects Detected")
-                print(f"Bouding boxes: {output}")
-                print("------------------------------------------------------")
+                self.frame_count += 1
+                if self.frame_count == 10:
+                    elapsed_time = time.time() - self.start_time
+                    self.fps = self.frame_count / elapsed_time
+                    self.frame_count = 0
+                    self.start_time = time.time()
 
-                # Display the processed frame
-                # cv2.imshow("Processed Frame", results[0].plot())
+                for result in results:
+                    for box in result.boxes:
+                        x1, y1, x2, y2 = map(int, box.xyxy[0])
+                        conf = float(box.conf[0])
+                        label = result.names[int(box.cls[0])]
+
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                        cv2.putText(frame, f"{label} {conf:.2f}", (x1, y1 - 10),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                cv2.putText(frame, f"FPS: {self.fps:.2f}", (10, 30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+
+                cv2.imshow("Processed Frame", frame)
+
                 if cv2.waitKey(1) & 0xFF == ord('q'):
-                    self.stop()
+                    self.parent.stop()
                     break
-
-                if self.start_time < time.time() - self.fps_delay:
-                    # Calculate and display FPS
-                    self.frame_count += 1
-                    elapsed_time = time.time() - self.start_time -self.fps_delay
-                    fps = self.frame_count / elapsed_time
-                    print(f"FPS: {fps:.2f}")
-
+                
     def stop(self):
         self.running = False
         cv2.destroyAllWindows()
@@ -118,8 +128,8 @@ class FrameProcessingThread(threading.Thread):
 class Detect:
     def __init__(self, source, model_path="yolo11.onnx"):
         self.frame_queue = queue.Queue(maxsize=5)
-        self.capture_thread = FrameCaptureThread(source, self.frame_queue)
-        self.processing_thread = FrameProcessingThread(self.frame_queue, model_path= model_path)
+        self.capture_thread = FrameCaptureThread(source, self.frame_queue , daemon= True)
+        self.processing_thread = FrameProcessingThread(self.frame_queue, model_path= model_path , daemon= True , parent= self)
 
     def start(self):
         self.capture_thread.start()
