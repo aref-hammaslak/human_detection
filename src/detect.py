@@ -112,8 +112,13 @@ class FrameProcessingThread(threading.Thread):
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                 cv2.putText(frame, f"FPS: {self.fps:.2f}", (10, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
-
-                cv2.imshow("Processed Frame", frame)
+                
+                if os.getenv('DISPLAY') is not None:
+                    cv2.imshow("Processed Frame", frame)
+                else:
+                    print(f"({len(results[0])}) object detected!")
+                    print(f"FPS: {self.fps:.2f}")
+                    
 
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     self.parent.stop()
