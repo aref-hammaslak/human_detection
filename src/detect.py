@@ -55,8 +55,7 @@ class FrameProcessingThread(threading.Thread):
         model_path,
         iou=os.getenv('IOU', 0.45),
         conf=os.getenv('CONF', 0.4),
-        target_classes=[0],
-        fps_delay=60,
+        target_classes=[0,1],
         daemon=True,
         parent=None,):
 
@@ -66,17 +65,14 @@ class FrameProcessingThread(threading.Thread):
         self.running = True
         self.model = YOLO(model_path, task='detect')  # Load YOLO model from Ultralytics
         self.img_size = 640
-        self.conf = conf
         self.target_classes = target_classes
-        self.iou = iou
-        self.conf = conf
+        self.iou = float(iou)
+        self.conf = float(conf)
         self.frame_count = 0
         self.start_time = time.time()
-        self.fps_delay = fps_delay
         self.fps = 0
         self.parent : Detect = parent
         
-        # print(f"fps will be printed after: {self.fps_delay}s") 
 
     def run(self):
         while self.running:
