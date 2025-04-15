@@ -6,7 +6,7 @@ import time
 from  ultralytics import YOLO
 import numpy as np
 import os
-
+from multiprocessing import Process , Queue 
 
 class FrameCaptureThread(threading.Thread):
     def __init__(self, source, queue, daemon=True):
@@ -48,7 +48,7 @@ class FrameCaptureThread(threading.Thread):
         self.cap.release()
 
 
-class FrameProcessingThread(threading.Thread):
+class FrameProcessingProcess(Process):
     def __init__(
         self,
         queue,
@@ -57,7 +57,7 @@ class FrameProcessingThread(threading.Thread):
         conf=os.getenv('CONF', 0.4),
         target_classes=[0,1],
         daemon=True,
-        parent=None,):
+        ):
 
         super().__init__()
         self.daemon = daemon
@@ -71,7 +71,7 @@ class FrameProcessingThread(threading.Thread):
         self.frame_count = 0
         self.start_time = time.time()
         self.fps = 0
-        self.parent : Detect = parent
+        # self.parent : Detect = parent # removed this line and parent 
         
 
     def run(self):
@@ -117,8 +117,10 @@ class FrameProcessingThread(threading.Thread):
                     
 
                 if cv2.waitKey(1) & 0xFF == ord('q'):
-                    self.parent.stop()
+                    self.running = False#self.parent.stop()#
                     break
+                
+        cv2.destroyAllWindows()
                 
     def stop(self):
         self.running = False
@@ -128,15 +130,17 @@ class FrameProcessingThread(threading.Thread):
 
 class Detect:
     def __init__(self, source, model_path="yolo11.onnx"):
-        self.frame_queue = queue.Queue(maxsize=5)
+        self.frame_queue = Queue(maxsize=5)
         self.capture_thread = FrameCaptureThread(source, self.frame_queue , daemon= True)
-        self.processing_thread = FrameProcessingThread(self.frame_queue, model_path= model_path , daemon= True , parent= self)
+        self.processing_process = FrameProcessingProcess(self.frame_queue, model_path= model_path , daemon= True ) #parent= self)
 
     def start(self):
         self.capture_thread.start()
-        self.processing_thread.start()
+        self.processing_process.start()
 
     def stop(self):
         self.capture_thread.stop()
-        self.processing_thread.stop()
+        self.processing_process.stop()
+        self.processing_process.terminate()
+        self.processing_process.join()
 

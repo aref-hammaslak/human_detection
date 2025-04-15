@@ -15,7 +15,7 @@ def main():
     detect.start()
 
     try:
-        while detect.capture_thread.running and detect.processing_thread.running:
+        while detect.capture_thread.running and detect.processing_process.running:
             time.sleep(.1)
 
     except KeyboardInterrupt:
